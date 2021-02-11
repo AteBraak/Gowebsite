@@ -21,11 +21,12 @@ var templatesDir = os.Getenv("TEMPLATES_DIR")
 // the struct which contains the complete
 // array of all attributes in the page file
 type Pagexml struct {
-	XMLName xml.Name `xml:"page"`
-	Type    string   `xml:"type,attr"`
-	Title   string   `xml:"title"`
-	Date    string   `xml:"date"`
-	Body    []byte   `xml:"body"`
+	XMLName      xml.Name  `xml:"page"`
+	Type         string    `xml:"type,attr"`
+	Title        string    `xml:"title"`
+	Date         time.Time `xml:"date"`
+	DateModified time.Time `xml:"datemodified"`
+	Body         []byte    `xml:"body"`
 }
 
 // neuteredFileSystem is used to prevent directory listing of static assets
@@ -42,6 +43,13 @@ type Page struct {
 	Pagexml [2]Pagexml
 	Common  Common
 }
+
+type PageList struct {
+	Title string
+	Date  time.Time
+}
+
+var pageList = [10]PageList{}
 
 func (nfs neuteredFileSystem) Open(path string) (http.File, error) {
 	// Check if path exists
@@ -67,12 +75,30 @@ func (nfs neuteredFileSystem) Open(path string) (http.File, error) {
 }
 
 func (pxml *Pagexml) savexml() error {
+	var savev *Pagexml
+	var newfile bool
 	filenamexml := pxml.Title + ".xml"
 	filenamexml = filepath.Join(DataDir, filenamexml)
+	err := getLatestPages()
+	if err != nil {
+		panic(err)
+	}
+	newfile = true
+	for i := 0; i < len(pageList); i++ {
+		if pxml.Title == pageList[i].Title {
+			newfile = false
+		}
+	}
 
 	t := time.Now()
-
-	savev := &Pagexml{Type: "Normal", Title: pxml.Title, Date: t.Format("20060102150405"), Body: pxml.Body}
+	if newfile {
+		savev = &Pagexml{Type: "Normal", Title: pxml.Title, Date: t, DateModified: t, Body: pxml.Body}
+	} else {
+		oldpxml, _ := loadPagexml(pxml.Title)
+		oldpxml.Body = pxml.Body
+		oldpxml.DateModified = t
+		savev = oldpxml
+	}
 
 	output, err := xml.MarshalIndent(savev, "  ", "    ")
 	if err != nil {
@@ -83,6 +109,7 @@ func (pxml *Pagexml) savexml() error {
 }
 
 //var CssStylesheet = "css/style.txt"
+
 func loadPagexml(title string) (*Pagexml, error) {
 	// Open our xmlFile
 	filenamexml := title + ".xml"
@@ -105,7 +132,7 @@ func loadPagexml(title string) (*Pagexml, error) {
 	// xmlFiles content into 'users' which we defined above
 	xml.Unmarshal(byteValue, &pagexmlv)
 
-	return &Pagexml{Title: pagexmlv.Title, Body: pagexmlv.Body}, nil
+	return &pagexmlv, nil
 	//return &Page{Title: title, Body: body, Css: css}, nil
 }
 
@@ -142,6 +169,48 @@ func getCommon() (*Common, error) {
 	}
 	about = append(about, "This is a sentence about me.")
 	return &Common{Pages: pages, About: about}, nil
+}
+
+func getLatestPages() error {
+	pages, err := getPages()
+	if err != nil {
+		panic(err)
+	}
+	for i := 0; i < len(pages); i++ {
+		pxml, err := loadPagexml(pages[i])
+		if err != nil {
+			panic(err)
+		}
+		pageList[i] = PageList{Title: pages[i], Date: pxml.Date}
+		//pageList[i].Date = pxml.Date
+		//pageList[i].Title = pages[i]
+	}
+	return nil
+}
+
+func homeHandler(w http.ResponseWriter, r *http.Request, title string) {
+	err := getLatestPages()
+	if err != nil {
+		panic(err)
+	}
+	//pageList[i] = PageList{Title: pages[i], Date: pxml.Date}
+	//title = "home"
+	var p *Page
+	p = new(Page)
+	for i := 0; i < len(pageList); i++ {
+		pxml, err := loadPagexml(pageList[i].Title)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		(*p).Pagexml[i] = *pxml
+		if i == 1 {
+			break
+		}
+	}
+	pcom, _ := getCommon()
+	(*p).Common = *pcom
+	renderTemplate(w, "home", p)
 }
 
 func viewHandler(w http.ResponseWriter, r *http.Request, title string) {
@@ -193,7 +262,8 @@ func renderTemplate(w http.ResponseWriter, tmpl string, p *Page) {
 	}
 }
 
-var validPath = regexp.MustCompile("^/(edit|save|view)/([a-zA-Z0-9]+)$")
+//var validPath = regexp.MustCompile("^/(edit|save|view)/([a-zA-Z0-9]+)$")
+var validPath = regexp.MustCompile("^(/(edit|save|view)/([a-zA-Z0-9]+)$|/home$)")
 
 func makeHandler(fn func(http.ResponseWriter, *http.Request, string)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -202,12 +272,12 @@ func makeHandler(fn func(http.ResponseWriter, *http.Request, string)) http.Handl
 			http.NotFound(w, r)
 			return
 		}
-		fn(w, r, m[2])
+		fn(w, r, m[3])
 	}
 }
 
 func main() {
-	//http.HandleFunc("", makeHandler(viewHandler))
+	http.HandleFunc("/home", makeHandler(homeHandler))
 	http.HandleFunc("/view/", makeHandler(viewHandler))
 	http.HandleFunc("/edit/", makeHandler(editHandler))
 	http.HandleFunc("/save/", makeHandler(saveHandler))
