@@ -9,15 +9,18 @@
 <body>
 
 <div class="header">
-  <h1>{{.Title}}</h1>
+  <h1>todo title{{printf "%#v" (index .Pagexml 0).Title}}</h1>
   <p>A <b>responsive</b> website created by me.</p>
 </div>
 
 <div class="navbar">
   <a href="#" class="active">Home</a>
+{{range .Common.Pages}}
+  <a href="{{.}}" class="active">{{.}}</a>
+{{end}}
   <a href="#">Link</a>
   <a href="#">Link</a>
-  <a href="/edit/{{.Title}}" class="right">edit</a>
+  <a href="/edit/{{(index .Pagexml 0).Title}}" class="right">edit</a>
 </div>
 
 <div class="row">
@@ -25,7 +28,9 @@
     <h2>About Me</h2>
     <h5>Photo of me:</h5>
     <div class="fakeimg" style="height:200px;">Image</div>
-    <p>Some text about me in culpa qui officia deserunt mollit anim..</p>
+{{range .Common.About}}
+    <p>{{.}}</p>
+{{end}}
     <h3>More Text</h3>
     <p>Lorem ipsum dolor sit ame.</p>
     <div class="fakeimg" style="height:60px;">Image</div><br>
@@ -37,7 +42,7 @@
     <h5>Title description, Dec 7, 2017</h5>
     <div class="fakeimg" style="height:200px;">Image</div>
     <p>Some text..</p>
-    <div>{{printf "%s" .Body}}</div>
+    <div>{{printf "%s" (index .Pagexml 0).Body}}</div>
     <br>
     <h2>TITLE HEADING</h2>
     <h5>Title description, Sep 2, 2017</h5>
@@ -46,7 +51,6 @@
     <p>Sunt in culpa qui officia deserunt mollit anim id est laborum consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco.</p>
   </div>
 </div>
-
 <div class="footer">
   <h2>Footer</h2>
 </div>

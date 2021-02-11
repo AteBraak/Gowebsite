@@ -33,10 +33,14 @@ type neuteredFileSystem struct {
 	fs http.FileSystem
 }
 
+type Common struct {
+	Pages []string
+	About []string
+}
+
 type Page struct {
-	Title string
-	Body  []byte
-	//Css   []byte
+	Pagexml [2]Pagexml
+	Common  Common
 }
 
 func (nfs neuteredFileSystem) Open(path string) (http.File, error) {
@@ -62,15 +66,15 @@ func (nfs neuteredFileSystem) Open(path string) (http.File, error) {
 	return f, nil
 }
 
-func (p *Page) savexml() error {
-	filenamexml := p.Title + ".xml"
+func (pxml *Pagexml) savexml() error {
+	filenamexml := pxml.Title + ".xml"
 	filenamexml = filepath.Join(DataDir, filenamexml)
 
 	t := time.Now()
 
-	v := &Pagexml{Type: "Normal", Title: p.Title, Date: t.Format("20060102150405"), Body: p.Body}
+	savev := &Pagexml{Type: "Normal", Title: pxml.Title, Date: t.Format("20060102150405"), Body: pxml.Body}
 
-	output, err := xml.MarshalIndent(v, "  ", "    ")
+	output, err := xml.MarshalIndent(savev, "  ", "    ")
 	if err != nil {
 		return err
 	}
@@ -79,7 +83,7 @@ func (p *Page) savexml() error {
 }
 
 //var CssStylesheet = "css/style.txt"
-func loadPagexml(title string) (*Page, error) {
+func loadPagexml(title string) (*Pagexml, error) {
 	// Open our xmlFile
 	filenamexml := title + ".xml"
 	filenamexml = filepath.Join(DataDir, filenamexml)
@@ -96,36 +100,81 @@ func loadPagexml(title string) (*Page, error) {
 	byteValue, _ := ioutil.ReadAll(xmlFile)
 
 	// we initialize our Pagexml
-	var pagexml Pagexml
+	var pagexmlv Pagexml
 	// we unmarshal our byteArray which contains our
 	// xmlFiles content into 'users' which we defined above
-	xml.Unmarshal(byteValue, &pagexml)
+	xml.Unmarshal(byteValue, &pagexmlv)
 
-	return &Page{Title: pagexml.Title, Body: pagexml.Body}, nil
+	return &Pagexml{Title: pagexmlv.Title, Body: pagexmlv.Body}, nil
 	//return &Page{Title: title, Body: body, Css: css}, nil
 }
 
+func getPages() ([]string, error) {
+	var files []string
+
+	err := filepath.Walk(DataDir, func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			return nil
+		}
+		//if filepath.Ext(path) != ".xml" {
+		//	return nil
+		//}
+		r, _ := regexp.Compile(".xml")
+		if !r.MatchString(info.Name()) {
+			return nil
+		}
+		filename := r.ReplaceAllString(info.Name(), "")
+		files = append(files, filename)
+		return nil
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	return files, nil
+}
+
+func getCommon() (*Common, error) {
+	var about []string
+	pages, err := getPages()
+	if err != nil {
+		//
+	}
+	about = append(about, "This is a sentence about me.")
+	return &Common{Pages: pages, About: about}, nil
+}
+
 func viewHandler(w http.ResponseWriter, r *http.Request, title string) {
-	p, err := loadPagexml(title)
+	var p *Page
+	p = new(Page)
+	pxml, err := loadPagexml(title)
 	if err != nil {
 		http.Redirect(w, r, "/edit/"+title, http.StatusFound)
 		return
 	}
+	pcom, _ := getCommon()
+	(*p).Pagexml[0] = *pxml
+	(*p).Common = *pcom
 	renderTemplate(w, "view", p)
 }
 
 func editHandler(w http.ResponseWriter, r *http.Request, title string) {
-	p, err := loadPagexml(title)
+	var p *Page
+	p = new(Page)
+	pxml, err := loadPagexml(title)
 	if err != nil {
-		p = &Page{Title: title}
+		pxml = &Pagexml{Title: title}
 	}
+	pcom, err := getCommon()
+	(*p).Pagexml[0] = *pxml
+	(*p).Common = *pcom
 	renderTemplate(w, "edit", p)
 }
 
 func saveHandler(w http.ResponseWriter, r *http.Request, title string) {
 	body := r.FormValue("body")
-	p := &Page{Title: title, Body: []byte(body)}
-	err := p.savexml()
+	pxml := &Pagexml{Title: title, Body: []byte(body)}
+	err := pxml.savexml()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -138,7 +187,6 @@ func saveHandler(w http.ResponseWriter, r *http.Request, title string) {
 func renderTemplate(w http.ResponseWriter, tmpl string, p *Page) {
 	pattern := filepath.Join(templatesDir, "*.tmpl")
 	var templates = template.Must(template.ParseGlob(pattern))
-
 	err := templates.ExecuteTemplate(w, tmpl+".tmpl", p)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
