@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Page Title</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../css/style.css" type="text/css">
+</head>
+<body>
+  <div class="header">
+    <h1>Website Name</h1>
+    <p><b>Signin</b></p>
+  </div>
+<div class="row">
+  <div class="main">
+  <form action="/sign/login" method="POST">
+    <div>
+        <label for="username">Username:</label>
+        <input type="text" id="username" name="username">
+    </div>
+    
+    <div>
+        <label for="pass">Password (8 characters minimum):</label>
+        <input type="password" id="pass" name="password"
+               minlength="8" required>
+    </div>
+    
+    <input type="submit" value="Sign in">
+  </form>
+  <a href="/sign/signup" class="right">signup</a>
+  </div>
+</div>
+  <div class="footer">
+    <h2>Footer</h2>
+  </div>
+</body>
+</html>

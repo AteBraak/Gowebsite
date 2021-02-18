@@ -3,6 +3,7 @@
 package main
 
 import (
+	"encoding/gob"
 	"encoding/xml"
 	"html/template"
 	"io/ioutil"
@@ -12,11 +13,16 @@ import (
 	"path/filepath"
 	"regexp"
 	"time"
+
+	"github.com/gorilla/securecookie"
+	"github.com/gorilla/sessions"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var DataDir = os.Getenv("DATA_DIR")
 var staticAssetsDir = os.Getenv("STATIC_ASSETS_DIR")
 var templatesDir = os.Getenv("TEMPLATES_DIR")
+var store = sessions.NewCookieStore([]byte(os.Getenv("SESSION_KEY")))
 
 // the struct which contains the complete
 // array of all attributes in the page file
@@ -39,9 +45,17 @@ type Common struct {
 	About []string
 }
 
+type User struct {
+	Id     int
+	Name   string
+	Access []string
+	Folder string
+}
+
 type Page struct {
 	Pagexml [2]Pagexml
 	Common  Common
+	User    User
 }
 
 type PageList struct {
@@ -49,7 +63,9 @@ type PageList struct {
 	Date  time.Time
 }
 
-var pageList = [10]PageList{}
+var pageList = []PageList{}
+
+var userhash string
 
 func (nfs neuteredFileSystem) Open(path string) (http.File, error) {
 	// Check if path exists
@@ -133,7 +149,6 @@ func loadPagexml(title string) (*Pagexml, error) {
 	xml.Unmarshal(byteValue, &pagexmlv)
 
 	return &pagexmlv, nil
-	//return &Page{Title: title, Body: body, Css: css}, nil
 }
 
 func getPages() ([]string, error) {
@@ -176,40 +191,90 @@ func getLatestPages() error {
 	if err != nil {
 		panic(err)
 	}
+	pageList = nil
 	for i := 0; i < len(pages); i++ {
 		pxml, err := loadPagexml(pages[i])
 		if err != nil {
 			panic(err)
 		}
-		pageList[i] = PageList{Title: pages[i], Date: pxml.Date}
-		//pageList[i].Date = pxml.Date
-		//pageList[i].Title = pages[i]
+		pageList = append(pageList, PageList{Title: pages[i], Date: pxml.Date})
 	}
 	return nil
 }
 
-func homeHandler(w http.ResponseWriter, r *http.Request, title string) {
+func getUser(s *sessions.Session) (*User, error) {
+	val := s.Values["user"]
+	var user = User{}
+	user, ok := val.(User)
+	if !ok {
+		return &User{Id: -1}, nil
+	}
+	return &user, nil
+}
+
+func getPagedata(r *http.Request, title []string) (*Page, error) {
 	err := getLatestPages()
 	if err != nil {
 		panic(err)
 	}
-	//pageList[i] = PageList{Title: pages[i], Date: pxml.Date}
-	//title = "home"
 	var p *Page
 	p = new(Page)
-	for i := 0; i < len(pageList); i++ {
-		pxml, err := loadPagexml(pageList[i].Title)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
+	var pxml *Pagexml
+	for i := 0; i < len(title); i++ {
+		pxml, err = loadPagexml(title[i])
 		(*p).Pagexml[i] = *pxml
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	pcom, _ := getCommon()
+	if err != nil {
+		return nil, err
+	}
+
+	session, err := store.Get(r, "session-name")
+	if err != nil {
+		return nil, err
+	}
+	puser, err := getUser(session)
+
+	(*p).Common = *pcom
+	(*p).User = *puser
+	return p, nil
+}
+
+func HashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
+	return string(bytes), err
+}
+
+func CheckPasswordHash(password, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
+}
+
+func homeHandler(w http.ResponseWriter, r *http.Request, title string) {
+	var titlelist []string
+	//len(pageList) < 1 {
+	if len(pageList) < 1 {
+		err := getLatestPages()
+		if err != nil {
+			panic(err)
+		}
+	}
+	for i := 0; i < len(pageList); i++ {
+		//titlelist[i] = pageList[i].Title
+		titlelist = append(titlelist, pageList[i].Title)
 		if i == 1 {
 			break
 		}
 	}
-	pcom, _ := getCommon()
-	(*p).Common = *pcom
+	p, err := getPagedata(r, titlelist)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	renderTemplate(w, "home", p)
 }
 
@@ -222,8 +287,22 @@ func viewHandler(w http.ResponseWriter, r *http.Request, title string) {
 		return
 	}
 	pcom, _ := getCommon()
+
+	session, err := store.Get(r, "session-name")
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	puser, err := getUser(session)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	(*p).Pagexml[0] = *pxml
 	(*p).Common = *pcom
+	(*p).User = *puser
+
 	renderTemplate(w, "view", p)
 }
 
@@ -251,6 +330,70 @@ func saveHandler(w http.ResponseWriter, r *http.Request, title string) {
 	http.Redirect(w, r, "/view/"+title, http.StatusFound)
 }
 
+func signHandler(w http.ResponseWriter, r *http.Request, title string) {
+	var p *Page
+	p = new(Page)
+	pcom, _ := getCommon()
+	(*p).Common = *pcom
+
+	//Signin->Login or  Signup->Adduser
+
+	if title == "signin" {
+		renderTemplate(w, "signin", p)
+	} else if title == "signup" {
+		renderTemplate(w, "signup", p)
+	} else if title == "login" {
+		//username := r.FormValue("username")
+		password := r.FormValue("password")
+		username := r.FormValue("username")
+		if CheckPasswordHash(password, userhash) {
+			session, _ := store.Get(r, "session-name")
+			// Set some session values.
+			user := &User{
+				Id:     108,
+				Name:   username,
+				Access: []string{"admin"},
+				Folder: " ",
+			}
+			session.Values["user"] = user
+			// Save it before we write to the response/return from the handler.
+			err := session.Save(r, w)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+		} else {
+			http.Error(w, "password does not match", http.StatusInternalServerError)
+		}
+		http.Redirect(w, r, "/home", http.StatusFound)
+	} else if title == "adduser" {
+		//username := r.FormValue("username")
+		password := r.FormValue("password")
+		hash, err := HashPassword(password)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		userhash = hash
+		http.Redirect(w, r, "/home", http.StatusFound)
+	} else if title == "signout" {
+		session, err := store.Get(r, "session-name")
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		session.Values["user"] = User{}
+		session.Options.MaxAge = -1
+		err = session.Save(r, w)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, "/home", http.StatusFound)
+	}
+}
+
 //var templates = template.Must(template.ParseFiles("edit.html", "view.html"))
 
 func renderTemplate(w http.ResponseWriter, tmpl string, p *Page) {
@@ -263,7 +406,7 @@ func renderTemplate(w http.ResponseWriter, tmpl string, p *Page) {
 }
 
 //var validPath = regexp.MustCompile("^/(edit|save|view)/([a-zA-Z0-9]+)$")
-var validPath = regexp.MustCompile("^(/(edit|save|view)/([a-zA-Z0-9]+)$|/home$)")
+var validPath = regexp.MustCompile("^(/(edit|save|sign|view)/([a-zA-Z0-9]+)$|/home$)")
 
 func makeHandler(fn func(http.ResponseWriter, *http.Request, string)) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -276,11 +419,31 @@ func makeHandler(fn func(http.ResponseWriter, *http.Request, string)) http.Handl
 	}
 }
 
+func init() {
+	authKeyOne := securecookie.GenerateRandomKey(64)
+	encryptionKeyOne := securecookie.GenerateRandomKey(32)
+
+	store = sessions.NewCookieStore(
+		authKeyOne,
+		encryptionKeyOne,
+	)
+
+	store.Options = &sessions.Options{
+		Path:     "/",
+		MaxAge:   60 * 15,
+		HttpOnly: true,
+	}
+
+	gob.Register(User{})
+
+}
+
 func main() {
 	http.HandleFunc("/home", makeHandler(homeHandler))
 	http.HandleFunc("/view/", makeHandler(viewHandler))
 	http.HandleFunc("/edit/", makeHandler(editHandler))
 	http.HandleFunc("/save/", makeHandler(saveHandler))
+	http.HandleFunc("/sign/", makeHandler(signHandler))
 
 	// Serve static files while preventing directory listing
 	//mux := http.NewServeMux()

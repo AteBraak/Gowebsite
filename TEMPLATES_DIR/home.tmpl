@@ -18,6 +18,16 @@
 {{range .Common.Pages}}
   <a href="/view/{{.}}">{{.}}</a>
 {{end}}
+{{if eq .User.Id -1}}
+    <a href="/sign/signin" class="right">signin</a>
+{{else}}
+  {{range .User.Access}}
+    {{if eq . "admin"}}
+    <a href="/sign/signout" class="right">signout</a>
+    <a class="right">Hello, {{.}}</a>
+    {{end}}
+  {{end}}
+{{end}}  
 </div>
 
 <div class="row">
