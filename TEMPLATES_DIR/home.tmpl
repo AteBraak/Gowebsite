@@ -21,12 +21,11 @@
 {{if eq .User.Id -1}}
     <a href="/sign/signin" class="right">signin</a>
 {{else}}
-  {{range .User.Access}}
-    {{if eq . "admin"}}
     <a href="/sign/signout" class="right">signout</a>
-    <a class="right">Hello, {{.}}</a>
-    {{end}}
+  {{if eq (index .User.Access 0) "admin"}}
+    <a href="/admi" class="right" class="active">Admin Tools</a>
   {{end}}
+    <a class="right">Hello, {{.User.Name}}{{if eq (index .User.Access 0) "admin"}}({{index .User.Access 0}}){{end}}</a>
 {{end}}  
 </div>
 

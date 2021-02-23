@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Page Title</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../css/style.css" type="text/css">
+</head>
+<body>
+  <div class="header">
+    <h1>Admin Tools</h1>
+    <p><b>Summary</b></p>
+  </div>
+<div class="navbar">
+  <a href="/home">Home</a>
+{{range .Common.Pages}}
+  <a href="/view/{{.}}">{{.}}</a>
+{{end}}
+{{if eq .User.Id -1}}
+    <a href="/sign/signin" class="right">signin</a>
+{{else}}
+    <a href="/sign/signout" class="right">signout</a>
+  {{if eq (index .User.Access 0) "admin"}}
+    <a href="/admi" class="right" class="active">Admin Tools</a>
+  {{end}}
+    <a class="right">Hello, {{.User.Name}}{{if eq (index .User.Access 0) "admin"}}({{index .User.Access 0}}){{end}}</a>
+  {{if eq (index .User.Access 0) "admin"}}
+    <a href="/edit/{{(index $.Pagexml 0).Title}}" class="right">edit</a>
+  {{end}}
+{{end}}  
+</div>
+<div class="row">
+  <div class="main">
+
+    <div>
+{{printf "%s" .}}
+    </div>
+    
+
+  </div>
+</div>
+  <div class="footer">
+    <h2>Footer</h2>
+  </div>
+</body>
+</html>
