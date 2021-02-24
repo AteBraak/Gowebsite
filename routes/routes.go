@@ -3,11 +3,11 @@ package routes
 import (
 	"Gowebsite/databaseserver"
 	"Gowebsite/page"
-	"html/template"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
+	"text/template"
 )
 
 var templatesDir = os.Getenv("TEMPLATES_DIR")
@@ -21,12 +21,13 @@ func HomeHandler(w http.ResponseWriter, r *http.Request, title string) {
 			panic(err)
 		}
 	}
-	for i := 0; i < len(page.PageList); i++ {
+	//for i := 0; i < len(page.PageList); i++ {
+	for _, apage := range page.PageList {
 		//titlelist[i] = page.PageList[i].Title
-		titlelist = append(titlelist, page.PageList[i].Title)
-		if i == 1 {
-			break
-		}
+		titlelist = append(titlelist, apage.Title)
+		//if i == 1 {
+		//	break
+		//}
 	}
 	p, err := page.GetPagedata(r, titlelist)
 	if err != nil {
@@ -57,7 +58,7 @@ func ViewHandler(w http.ResponseWriter, r *http.Request, title string) {
 		return
 	}
 
-	(*p).Pagexml[0] = *pxml
+	(*p).Pagexml = append((*p).Pagexml, *pxml)
 	(*p).Common = *pcom
 	(*p).User = *puser
 
@@ -97,7 +98,7 @@ func EditHandler(w http.ResponseWriter, r *http.Request, title string) {
 		pxml = &page.Pagexml{Title: title}
 	}
 	pcom, err := page.GetCommon()
-	(*p).Pagexml[0] = *pxml
+	(*p).Pagexml = append((*p).Pagexml, *pxml)
 	(*p).Common = *pcom
 	(*p).User = *puser
 	renderTemplate(w, "edit", p)
