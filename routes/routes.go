@@ -4,13 +4,13 @@ import (
 	"Gowebsite/databaseserver"
 	"Gowebsite/page"
 	"net/http"
-	"os"
 	"path/filepath"
 	"regexp"
 	"text/template"
 )
 
-var templatesDir = os.Getenv("TEMPLATES_DIR")
+//var templatesDir = os.Getenv("TEMPLATES_DIR")
+var templatesDir = "TEMPLATES_DIR"
 
 func HomeHandler(w http.ResponseWriter, r *http.Request, title string) {
 	var titlelist []string

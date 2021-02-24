@@ -5,10 +5,10 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-	"os"
 )
 
-var staticAssetsDir = os.Getenv("STATIC_ASSETS_DIR")
+//var staticAssetsDir = os.Getenv("STATIC_ASSETS_DIR")
+var staticAssetsDir = "STATIC_ASSETS_DIR"
 
 func UploadFile(w http.ResponseWriter, r *http.Request) {
 	// Parse our multipart form, 10 << 20 specifies a maximum

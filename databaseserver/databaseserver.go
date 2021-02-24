@@ -22,7 +22,9 @@ var userDatabasePassword = "Password2"
 
 var password = "Password"
 var password2 = "Password2"
-var DataDir = os.Getenv("DATA_DIR")
+
+//var DataDir = os.Getenv("DATA_DIR")
+var DataDir = "DATA_DIR"
 
 type Userdata struct {
 	Type         string   `xml:"type,attr"`

@@ -13,7 +13,8 @@ import (
 	"github.com/gorilla/sessions"
 )
 
-var DataDir = os.Getenv("DATA_DIR")
+//var DataDir = os.Getenv("DATA_DIR")
+var DataDir = "DATA_DIR"
 
 // the struct which contains the complete
 // array of all attributes in the page file

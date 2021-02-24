@@ -14,7 +14,8 @@ import (
 	"github.com/gorilla/sessions"
 )
 
-var staticAssetsDir = os.Getenv("STATIC_ASSETS_DIR")
+//var staticAssetsDir = os.Getenv("STATIC_ASSETS_DIR")
+var staticAssetsDir = "STATIC_ASSETS_DIR"
 
 // neuteredFileSystem is used to prevent directory listing of static assets
 type neuteredFileSystem struct {
