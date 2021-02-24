@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/gorilla/sessions"
@@ -26,7 +27,7 @@ type Pagexml struct {
 }
 
 type Page struct {
-	Pagexml [2]Pagexml
+	Pagexml []Pagexml
 	Common  Common
 	User    User
 }
@@ -121,8 +122,17 @@ func LoadPagexml(title string) (*Pagexml, error) {
 	return &pagexmlv, nil
 }
 
+//Gets list of pages
+//function excludes the excludepages variable
 func GetPages() ([]string, error) {
 	var files []string
+
+	//fileext := `xml`
+	var regexMatch strings.Builder
+	var regexRemove strings.Builder
+	// Note for regex ?! does not work in golang
+	regexMatch.WriteString(`((^|\/)(\w*))\.xml`)
+	regexRemove.WriteString(`\.xml`)
 
 	err := filepath.Walk(DataDir, func(path string, info os.FileInfo, err error) error {
 		if info.IsDir() {
@@ -131,11 +141,12 @@ func GetPages() ([]string, error) {
 		//if filepath.Ext(path) != ".xml" {
 		//	return nil
 		//}
-		r, _ := regexp.Compile(".xml")
-		if !r.MatchString(info.Name()) {
+		rmatch, _ := regexp.Compile(regexMatch.String())
+		rremove, _ := regexp.Compile(regexRemove.String())
+		if !rmatch.MatchString(info.Name()) {
 			return nil
 		}
-		filename := r.ReplaceAllString(info.Name(), "")
+		filename := rremove.ReplaceAllString(info.Name(), "")
 		files = append(files, filename)
 		return nil
 	})
@@ -152,10 +163,17 @@ func GetCommon() (*Common, error) {
 	if err != nil {
 		//
 	}
-	about = append(about, "This is a sentence about me.")
+	pxml, err := LoadPagexml("-about")
+	if err != nil {
+		panic(err)
+	}
+
+	about = append(about, string(pxml.Body))
 	return &Common{Pages: pages, About: about}, nil
 }
 
+//this updates the variable PageList with the list of pages
+// to do: sort sent list based on latest to oldest
 func GetLatestPages() error {
 	pages, err := GetPages()
 	if err != nil {
@@ -182,7 +200,8 @@ func GetPagedata(r *http.Request, title []string) (*Page, error) {
 	var pxml *Pagexml
 	for i := 0; i < len(title); i++ {
 		pxml, err = LoadPagexml(title[i])
-		(*p).Pagexml[i] = *pxml
+		//(*p).Pagexml[i] = *pxml
+		(*p).Pagexml = append((*p).Pagexml, *pxml)
 		if err != nil {
 			return nil, err
 		}
