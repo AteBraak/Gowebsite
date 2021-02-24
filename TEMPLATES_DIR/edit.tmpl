@@ -1,6 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Page Title</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="../css/style.css" type="text/css">
+<script src="https://cdn.tiny.cloud/1/ms4ywhgvr3vuldscilvsmm446ird20afnr8qox9k9o9675f8/tinymce/5/tinymce.min.js" referrerpolicy="origin"></script>
+<script>
+    tinymce.init({
+      selector: '#body',
+      plugins: 'code link',
+      menubar: 'edit view insert format tools table help',
+    });
+  </script>
+</head>
+<body>
+
+<div class="header">
+  <h1>{{(index .Pagexml 0).Title}}</h1>
+  <p>A <b>responsive</b> website created by me.</p>
+</div>
+
 <h1>Editing {{(index .Pagexml 0).Title}}</h1>
 
 <form action="/save/{{(index .Pagexml 0).Title}}" method="POST">
-<div><textarea name="body" rows="20" cols="80">{{printf "%s" (index .Pagexml 0).Body}}</textarea></div>
+<div><textarea id="body" name="body" rows="20" cols="80">{{printf "%s" (index .Pagexml 0).Body}}</textarea></div>
 <div><input type="submit" value="Save"></div>
 </form>
