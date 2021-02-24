@@ -4,6 +4,7 @@ import (
 	"Gowebsite/databaseserver"
 	"Gowebsite/page"
 	"Gowebsite/routes"
+	"Gowebsite/upload"
 	"encoding/gob"
 	"log"
 	"net/http"
@@ -85,6 +86,7 @@ func main() {
 	http.HandleFunc("/edit/", routes.MakeHandler(routes.EditHandler))
 	http.HandleFunc("/save/", routes.MakeHandler(routes.SaveHandler))
 	http.HandleFunc("/sign/", routes.MakeHandler(routes.SignHandler))
+	http.HandleFunc("/upload", upload.UploadFile)
 
 	// Serve static files while preventing directory listing
 	//mux := http.NewServeMux()
